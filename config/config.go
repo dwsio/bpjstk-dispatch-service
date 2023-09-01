@@ -5,60 +5,62 @@ import (
 
 	kafkaClient "git.bpjsketenagakerjaan.go.id/centralized-notification-system/dispatch-service/pkg/kafka"
 	loggerClient "git.bpjsketenagakerjaan.go.id/centralized-notification-system/dispatch-service/pkg/logger"
+	metricClient "git.bpjsketenagakerjaan.go.id/centralized-notification-system/dispatch-service/pkg/metric"
 	tracerClient "git.bpjsketenagakerjaan.go.id/centralized-notification-system/dispatch-service/pkg/tracer"
 )
 
 type Config struct {
-	Project       *Project
-	Logger        *loggerClient.Config
-	Kafka         *kafkaClient.Config
-	KafkaTopic    *KafkaTopic
-	Tracer        *tracerClient.Config
-	ServiceClient *ServiceClient
+	Project        *Project             `mapstructure:"PROJECT"`
+	Logger         *loggerClient.Config `mapstructure:"LOGGER_CLIENT"`
+	Kafka          *kafkaClient.Config  `mapstructure:"KAFKA_CLIENT"`
+	KafkaTopic     *KafkaTopic          `mapstructure:"KAFKA_TOPIC"`
+	Tracer         *tracerClient.Config `mapstructure:"TRACER_CLIENT"`
+	Metric         *metricClient.Config `mapstructure:"METRIC_CLIENT"`
+	ProviderClient *ProviderClient      `mapstructure:"SERVICE_CLIENT"`
 }
 
 type Project struct {
-	ServiceName string
-	Version     string
-	Environment string
-	Priority    string
-	ServerIP    string
+	ServiceName string `mapstructure:"SERVICE_NAME"`
+	Version     string `mapstructure:"VERSION"`
+	Environment string `mapstructure:"ENVIRONMENT"`
+	Priority    string `mapstructure:"PRIORITY"`
+	ServerIP    string `mapstructure:"SERVER_IP"`
 }
 
 type KafkaTopic struct {
-	Producer string
-	Consumer string
+	Producer string `mapstructure:"PRODUCER"`
+	Consumer string `mapstructure:"CONSUMER"`
 }
 
-type ServiceClient struct {
-	EmailService         *EmailService
-	SmsService           *SmsService
-	FcmPushService       *FcmPushService
-	OneSignalPushService *OneSignalPushService
+type ProviderClient struct {
+	EmailProvider         *EmailProvider         `mapstructure:"EMAIL_PROVIDER"`
+	SmsProvider           *SmsProvider           `mapstructure:"SMS_PROVIDER"`
+	FcmPushProvider       *FcmPushProvider       `mapstructure:"FCM_PUSH_PROVIDER"`
+	OneSignalPushProvider *OneSignalPushProvider `mapstructure:"ONESIGNAL_PUSH_PROVIDER"`
 }
 
-type EmailService struct {
-	Url     string
-	From    string
-	Webhook string
+type EmailProvider struct {
+	Url     string `mapstructure:"URL"`
+	From    string `mapstructure:"FROM"`
+	Webhook string `mapstructure:"WEBHOOK"`
 }
 
-type SmsService struct {
-	Url      string
-	Username string
-	Password string
+type SmsProvider struct {
+	Url      string `mapstructure:"URL"`
+	Username string `mapstructure:"USERNAME"`
+	Password string `mapstructure:"PASSWORD"`
 }
 
-type FcmPushService struct {
-	Url    string
-	ApiKey string
+type FcmPushProvider struct {
+	Url    string `mapstructure:"URL"`
+	ApiKey string `mapstructure:"API_KEY"`
 }
 
-type OneSignalPushService struct {
-	Url       string
-	ApiKey    string
-	JmoAppId  string
-	SippAppId string
+type OneSignalPushProvider struct {
+	Url       string `mapstructure:"URL"`
+	ApiKey    string `mapstructure:"API_KEY"`
+	JmoAppId  string `mapstructure:"JMO_APP_ID"`
+	SippAppId string `mapstructure:"SIPP_APP_ID"`
 }
 
 func getEnv(key, fallback string) string {
@@ -76,39 +78,36 @@ func LoadConfigFromOS() *Config {
 			Environment: getEnv("PROJECT_ENVIRONMENT", "dev"),
 		},
 		Logger: &loggerClient.Config{
-			Encoding:   getEnv("LOGGER_ENCODING", "json"),
-			Level:      getEnv("LOGGER_LEVEL", "info"),
-			OutputPath: getEnv("LOGGER_OUTPUT_PATH", "stdout"),
-			ErrorPath:  getEnv("LOGGER_ERROR_PATH", "stderr"),
+			Encoding: getEnv("LOGGER_ENCODING", "console"),
 		},
-		ServiceClient: &ServiceClient{
-			EmailService: &EmailService{
-				Url:     getEnv("EMAIL_SERVICE_URL", "http://172.28.108.181:2014/WSCom/services/Main?wsdl"),
-				From:    getEnv("EMAIL_SERVICE_FROM", "noreply@bpjsketenagakerjaan.go.id"),
-				Webhook: getEnv("EMAIL_SERVICE_WEBHOOK", "http://172.28.108.245:8080/api/v1/webhook/"),
+		ProviderClient: &ProviderClient{
+			EmailProvider: &EmailProvider{
+				Url:     getEnv("EMAIL_PROVIDER_URL", "http://172.28.108.181:2014/WSCom/services/Main?wsdl"),
+				From:    getEnv("EMAIL_PROVIDER_FROM", "noreply@bpjsketenagakerjaan.go.id"),
+				Webhook: getEnv("EMAIL_PROVIDER_WEBHOOK", "http://172.28.108.245:8080/api/v1/webhook/"),
 			},
-			SmsService: &SmsService{
-				Url:      getEnv("SMS_SERVICE_URL", "http://172.28.108.181:2014/SmsApps/services/Main?wsdl"),
-				Username: getEnv("SMS_SERVICE_USERNAME", "sso"),
-				Password: getEnv("SMS_SERVICE_PASSWORD", "sso123"),
+			SmsProvider: &SmsProvider{
+				Url:      getEnv("SMS_PROVIDER_URL", "http://172.28.108.181:2014/SmsApps/services/Main?wsdl"),
+				Username: getEnv("SMS_PROVIDER_USERNAME", "sso"),
+				Password: getEnv("SMS_PROVIDER_PASSWORD", "sso123"),
 			},
-			FcmPushService: &FcmPushService{
-				Url:    getEnv("FCM_PUSH_SERVICE_URL", "https://fcm.googleapis.com/fcm/send"),
-				ApiKey: getEnv("FCM_PUSH_SERVICE_API_KEY", ""),
+			FcmPushProvider: &FcmPushProvider{
+				Url:    getEnv("FCM_PUSH_PROVIDER_URL", "https://fcm.googleapis.com/fcm/send"),
+				ApiKey: getEnv("FCM_PUSH_PROVIDER_API_KEY", ""),
 			},
-			OneSignalPushService: &OneSignalPushService{
-				Url:       getEnv("ONESIGNAL_PUSH_SERVICE_URL", "https://onesignal.com/api/v1/notifications"),
-				ApiKey:    getEnv("ONESIGNAL_PUSH_SERVICE_API_KEY", "MWE4M2U4OGEtMmRlZi00ODI0LTkxNDYtYjFiZmIyZTAzYzJk"),
-				JmoAppId:  getEnv("ONESIGNAL_PUSH_SERVICE_JMO_APP_ID", "40b2bca3-fbc3-47b1-a518-df6093404d7f"),
-				SippAppId: getEnv("ONESIGNAL_PUSH_SERVICE_SIPP_APP_ID", ""),
+			OneSignalPushProvider: &OneSignalPushProvider{
+				Url:       getEnv("ONESIGNAL_PUSH_PROVIDER_URL", "https://onesignal.com/api/v1/notifications"),
+				ApiKey:    getEnv("ONESIGNAL_PUSH_PROVIDER_API_KEY", "MWE4M2U4OGEtMmRlZi00ODI0LTkxNDYtYjFiZmIyZTAzYzJk"),
+				JmoAppId:  getEnv("ONESIGNAL_PUSH_PROVIDER_JMO_APP_ID", "40b2bca3-fbc3-47b1-a518-df6093404d7f"),
+				SippAppId: getEnv("ONESIGNAL_PUSH_PROVIDER_SIPP_APP_ID", ""),
 			},
 		},
 		Kafka: &kafkaClient.Config{
-			ProducerBroker: getEnv("KAFKA_PRODUCER_BROKER", "localhost:9095"),
-			ConsumerBroker: getEnv("KAFKA_CONSUMER_BROKER", "localhost:9094"),
-			GroupID:        getEnv("KAFKA_GROUP_ID", "cns_dispatch_consumer"),
-			PoolSize:       getEnv("KAFKA_POOL_SIZE", "10"),
-			Partition:      getEnv("KAFKA_PARTITION", "10"),
+			ProducerBrokers: getEnv("KAFKA_PRODUCER_BROKERS", "localhost:9095"),
+			ConsumerBrokers: getEnv("KAFKA_CONSUMER_BROKERS", "localhost:9094"),
+			GroupID:         getEnv("KAFKA_GROUP_ID", "cns_dispatch_consumer"),
+			PoolSize:        getEnv("KAFKA_POOL_SIZE", "10"),
+			Partition:       getEnv("KAFKA_PARTITION", "10"),
 		},
 		KafkaTopic: &KafkaTopic{
 			Producer: getEnv("KAFKA_TOPIC_PRODUCER", "cns_trc_email,cns_trc_sms,cns_trc_inapp,cns_trc_push,cns_trc_sms_pool"),
@@ -116,6 +115,13 @@ func LoadConfigFromOS() *Config {
 		},
 		Tracer: &tracerClient.Config{
 			Endpoint: getEnv("TRACER_ENDPOINT", "http://localhost:14268/api/traces"),
+			Prefix:   getEnv("TRACER_PREFIX", "cns_dispatch"),
+		},
+		Metric: &metricClient.Config{
+			Port:      getEnv("METRIC_PORT", ":8085"),
+			Path:      getEnv("METRIC_PATH", "/metrics"),
+			Prefix:    getEnv("METRIC_PREFIX", "cns_dispatch"),
+			MeterName: getEnv("METRIC_METER_NAME", "git.bpjsketenagakerjaan.go.id/centralized-notification-system/dispatch-service"),
 		},
 	}
 }

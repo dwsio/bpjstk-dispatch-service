@@ -1,14 +1,35 @@
 package utils
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"git.bpjsketenagakerjaan.go.id/centralized-notification-system/dispatch-service/internal/model"
+	"github.com/google/uuid"
 )
+
+func InjectMetadataToNewContext(parentCtx context.Context, traceID string, topic string) context.Context {
+	ctx := context.WithValue(parentCtx, "trace_id", traceID)
+	ctx = context.WithValue(ctx, "transaction_id", uuid.New().String())
+	ctx = context.WithValue(ctx, "topic", topic)
+	ctx = context.WithValue(ctx, "start_time", time.Now().UnixMilli())
+
+	return ctx
+}
+
+func ExtractMetadataFromContext(ctx context.Context) (string, string, string, int64) {
+	traceID := ctx.Value("trace_id").(string)
+	transactionID := ctx.Value("transaction_id").(string)
+	topic := ctx.Value("topic").(string)
+	startTime := ctx.Value("start_time").(int64)
+
+	return traceID, transactionID, topic, startTime
+}
 
 func StructToString(data interface{}) (string, error) {
 	jsonBytes, err := json.Marshal(data)

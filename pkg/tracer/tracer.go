@@ -14,7 +14,8 @@ import (
 )
 
 type Config struct {
-	Endpoint string
+	Endpoint string `mapstructure:"ENDPOINT"`
+	Prefix   string `mapstructure:"PREFIX"`
 }
 
 type AppTracer struct {
@@ -23,21 +24,17 @@ type AppTracer struct {
 }
 
 func NewAppTracer(ctx context.Context, cfg *Config, serviceName, version string) (*AppTracer, error) {
-	// Validate configuration
 	if cfg.Endpoint == "" {
 		return nil, fmt.Errorf("endpoint is missing in the tracer configuration")
 	}
 
-	// Initialize Jaeger exporter
-	exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(cfg.Endpoint)))
+	exporter, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(cfg.Endpoint)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Jaeger exporter: %w", err)
 	}
 
-	// Create resource
-	res, err := resource.New(
+	resource, err := resource.New(
 		ctx,
-		resource.WithFromEnv(),
 		resource.WithProcess(),
 		resource.WithTelemetrySDK(),
 		resource.WithHost(),
@@ -50,26 +47,21 @@ func NewAppTracer(ctx context.Context, cfg *Config, serviceName, version string)
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
-	// Create span processor
-	bsp := sdkTrace.NewBatchSpanProcessor(exp)
+	batchSpanProcessor := sdkTrace.NewBatchSpanProcessor(exporter)
 
-	// Create TracerProvider
-	tp := sdkTrace.NewTracerProvider(
-		sdkTrace.WithSpanProcessor(bsp),
-		sdkTrace.WithResource(res),
+	tracerProvider := sdkTrace.NewTracerProvider(
+		sdkTrace.WithSpanProcessor(batchSpanProcessor),
+		sdkTrace.WithResource(resource),
 	)
 
-	// Create AppTracer instance
 	at := &AppTracer{
-		TraceProvider: tp,
+		TraceProvider: tracerProvider,
+		Tracer:        tracerProvider.Tracer(cfg.Prefix),
 	}
-	at.Tracer = tp.Tracer("")
 
-	// Set TextMap propagator and TracerProvider globally
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-	otel.SetTracerProvider(tp)
+	otel.SetTracerProvider(tracerProvider)
 
-	// Log successful tracer initialization
 	fmt.Println("Tracer initialized successfully. Endpoint:", cfg.Endpoint)
 
 	return at, nil

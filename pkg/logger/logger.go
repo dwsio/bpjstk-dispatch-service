@@ -1,145 +1,87 @@
 package logger
 
 import (
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"log"
+	"os"
+	"reflect"
 )
 
-const (
-	// LogLevelDebug for debugging information.
-	LogLevelDebug string = "debug"
-	// LogLevelInfo for informational messages.
-	LogLevelInfo string = "info"
-	// LogLevelError for error messages.
-	LogLevelError string = "error"
-)
-
-// LoggerConfig holds the configuration for creating a new logger.
 type Config struct {
-	Encoding   string
-	Level      string
-	OutputPath string
-	ErrorPath  string
-}
-
-// AppLogger provides structured logging functionality.
-type AppLogger struct {
-	Logger  *zap.Logger
-	SLogger *zap.SugaredLogger
+	Encoding string
 }
 
 type LogFields struct {
-	Timestamp         string    `json:"timestamp"`
-	LogLevel          string    `json:"log_level"`
-	TransactionID     string    `json:"transaction_id"`
-	ServiceName       string    `json:"service_name"`
-	Endpoint          string    `json:"endpoint"`
-	Protocol          string    `json:"protocol"`
-	MethodType        string    `json:"method_type"`
-	ExecutionType     string    `json:"execution_type"`
-	ContentType       string    `json:"content_type"`
-	FunctionName      string    `json:"function_name"`
-	UserInfo          *UserInfo `json:"user_info"`
-	ExecutionTime     string    `json:"execution_time"`
-	ServerIP          string    `json:"server_ip"`
-	ClientIP          string    `json:"client_ip"`
-	EventName         string    `json:"event_name"`
-	TraceID           string    `json:"trace_id"`
-	PrevTransactionID string    `json:"prev_transaction_id"`
-	Body              string    `json:"body"`
-	Result            string    `json:"result"`
-	Error             string    `json:"error"`
-	FlagStartOrStop   string    `json:"flag_start_or_stop"`
-	Message           *Message  `json:"message"`
+	Timestamp         string
+	LogLevel          string
+	TransactionID     string
+	ServiceName       string
+	Endpoint          string
+	Protocol          string
+	MethodType        string
+	ExecutionType     string
+	ContentType       string
+	FunctionName      string
+	UserInfo          *UserInfo
+	ExecutionTime     string
+	ServerIP          string
+	ClientIP          string
+	EventName         string
+	TraceID           string
+	PrevTransactionID string
+	Body              string
+	Result            string
+	Error             string
+	FlagStartOrStop   string
+	Message           *Message
 }
 
 type UserInfo struct {
-	Username string `json:"username"`
-	Role     string `json:"role"`
-	Others   string `json:"others"`
+	Username string
+	Role     string
+	Others   string
 }
 
 type Message struct {
-	Activity          string `json:"activity"`
-	ObjectPerformedOn string `json:"object_performed_on"`
-	ResultOfActivity  string `json:"result_of_activity"`
-	ErrorCode         string `json:"error_code"`
-	ErrorMessage      string `json:"error_message"`
-	ShortDescription  string `json:"short_description"`
+	Activity          string
+	ObjectPerformedOn string
+	ResultOfActivity  string
+	ErrorCode         string
+	ErrorMessage      string
+	ShortDescription  string
 }
 
-// NewAppLogger creates a new AppLogger instance.
-func NewAppLogger(cfg *Config) (*AppLogger, error) {
-	var zapLevel zapcore.Level
-	switch cfg.Level {
-	case LogLevelDebug:
-		zapLevel = zapcore.DebugLevel
-	case LogLevelError:
-		zapLevel = zapcore.ErrorLevel
-	default:
-		zapLevel = zapcore.InfoLevel
-	}
+type AppLogger struct {
+	logger *log.Logger
+}
 
-	cfgZap := zap.Config{
-		Encoding:         cfg.Encoding,
-		Level:            zap.NewAtomicLevelAt(zapLevel),
-		OutputPaths:      []string{cfg.OutputPath},
-		ErrorOutputPaths: []string{cfg.ErrorPath},
-	}
-
-	logger, err := cfgZap.Build()
-	if err != nil {
-		return nil, err
-	}
-	defer logger.Sync()
-
+func NewAppLogger() *AppLogger {
 	return &AppLogger{
-		Logger:  logger,
-		SLogger: logger.Sugar(),
-	}, nil
+		logger: log.New(os.Stdout, "", 0),
+	}
 }
 
-// StructuredPrint logs the given LogFields.
 func (al *AppLogger) StructuredPrint(lf *LogFields) {
-	if lf == nil {
-		al.SLogger.Error("Print called with nil LogFields")
-		return
-	}
+	wrapEmptyFields(lf)
 
-	al.Logger.Info("",
-		zap.String("timestamp", lf.Timestamp),
-		zap.String("log_level", lf.LogLevel),
-		zap.String("transaction_id", lf.TransactionID),
-		zap.String("service_name", lf.ServiceName),
-		zap.String("endpoint", lf.Endpoint),
-		zap.String("protocol", lf.Protocol),
-		zap.String("method_type", lf.MethodType),
-		zap.String("execution_type", lf.ExecutionType),
-		zap.String("content_type", lf.ContentType),
-		zap.String("function_name", lf.FunctionName),
-		zap.Any("user_info", lf.UserInfo),
-		zap.String("execution_time", lf.ExecutionTime),
-		zap.String("server_ip", lf.ServerIP),
-		zap.String("client_ip", lf.ClientIP),
-		zap.String("event_name", lf.EventName),
-		zap.String("trace_id", lf.TraceID),
-		zap.String("prev_transaction_id", lf.PrevTransactionID),
-		zap.String("body", lf.Body),
-		zap.String("result", lf.Result),
-		zap.String("error", lf.Error),
-		zap.String("flag_start_or_stop", lf.FlagStartOrStop),
-		zap.Any("message", lf.Message),
-	)
+	logString := lf.Timestamp + " [" + lf.LogLevel + "] \t " + lf.TransactionID + " \t " + lf.ServiceName + " \t " + lf.Endpoint + " \t " + lf.Protocol + " \t " + lf.MethodType + " \t " + lf.ExecutionType + " \t " + lf.ContentType + " \t " + lf.FunctionName + " \t '" + lf.UserInfo.Username + "' as '" + lf.UserInfo.Role + "' . '" + lf.UserInfo.Others + "' \t " + lf.ExecutionTime + " ms \t " + lf.ServerIP + " \t " + lf.ClientIP + " \t " + lf.EventName + " \t " + lf.TraceID + " \t " + lf.PrevTransactionID + " \t " + lf.Body + " \t " + lf.Result + " \t " + lf.Error + " \t [" + lf.FlagStartOrStop + "] \t '" + lf.Message.Activity + "' on '" + lf.Message.ObjectPerformedOn + "' with result '" + lf.Message.ShortDescription + "' with error '" + lf.Message.ErrorMessage + "' : '" + lf.Message.ErrorCode + "' . '" + lf.Message.ShortDescription + "'"
+
+	al.logger.Println(logString)
 }
 
-// LogError logs the error along with additional context.
-func (al *AppLogger) LogError(err error, message string) {
-	if err == nil {
-		al.SLogger.Error("LogError called with nil error")
-		return
-	}
+func wrapEmptyFields(fields interface{}) {
+	v := reflect.ValueOf(fields).Elem()
 
-	al.Logger.Error(message,
-		zap.Error(err),
-	)
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if field.Kind() == reflect.Ptr {
+			if field.IsNil() {
+				continue
+			}
+			wrapEmptyFields(field.Interface())
+		} else if field.Kind() == reflect.Struct {
+			wrapEmptyFields(field.Addr().Interface())
+		} else if field.Kind() == reflect.String && field.String() == "" {
+			field.SetString("-")
+		}
+	}
 }
