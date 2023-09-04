@@ -103,8 +103,8 @@ func LoadConfigFromOS() *Config {
 			},
 		},
 		Kafka: &kafkaClient.Config{
-			ProducerBrokers: getEnv("KAFKA_PRODUCER_BROKERS", "localhost:9095"),
-			ConsumerBrokers: getEnv("KAFKA_CONSUMER_BROKERS", "localhost:9094"),
+			ProducerBrokers: getEnv("KAFKA_PRODUCER_BROKERS", "localhost:29092"),
+			ConsumerBrokers: getEnv("KAFKA_CONSUMER_BROKERS", "localhost:29093"),
 			GroupID:         getEnv("KAFKA_GROUP_ID", "cns_dispatch_consumer"),
 			PoolSize:        getEnv("KAFKA_POOL_SIZE", "10"),
 			Partition:       getEnv("KAFKA_PARTITION", "10"),

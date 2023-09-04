@@ -122,7 +122,7 @@ func (s *Server) setupMetric(ctx context.Context, cancel context.CancelFunc) err
 	}
 
 	s.serviceMetrics = serviceMetrics.NewServiceMetrics(s.appMetric.Meter)
-	s.metricServer = metricServer.NewMetricServer(s.cfg.Metric.Path)
+	s.metricServer = metricServer.NewMetricServer(s.cfg.Metric.Path, s.cfg.Metric.Prefix)
 
 	go func() {
 		defer cancel()

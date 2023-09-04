@@ -2,6 +2,7 @@
 
 ENGINE=main.go
 BUILD_DIR=build
+REGISTRY_URL=172.28.108.245:8082/cns-dev/dispatch-service:v1.0
 
 run:
 	go run ${ENGINE} run -c jmo -p normal
@@ -29,18 +30,22 @@ tidy:
 lint:
 	golangci-lint run ./...
 
-docker-compose:
-	@echo Starting docker compose
+docker-local:
+	@echo Starting local docker compose
+	docker-compose -f docker-compose.local.yaml up -d --build
+
+docker-dev:
+	@echo "Running services in container"
 	docker compose -f docker-compose.yaml up -d --build
 
 docker-build:
 	@echo "Building service in container"
 	docker build -t dispatch_service -f docker/dispatch_service.Dockerfile .
 
-local:
-	@echo Starting local docker compose
-	docker-compose -f docker-compose.local.yaml up -d --build
+docker-tag:
+	@echo Start tagging docker image
+	docker tag ${SERVICE_NAME}:latest ${REGISTRY_URL}
 
-docker-dev:
-	@echo "Running service in container"
-	docker compose -f docker-compose.yaml up -d --build
+docker-push:
+	@echo Start push docker image
+	docker push ${REGISTRY_URL}

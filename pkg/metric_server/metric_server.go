@@ -14,8 +14,9 @@ type MetricServer struct {
 	server *echo.Echo
 }
 
-func NewMetricServer(path string) *MetricServer {
+func NewMetricServer(path string, serviceName string) *MetricServer {
 	e := echo.New()
+	e.Use(echoprometheus.NewMiddleware(serviceName))
 	e.GET(path, echoprometheus.NewHandler())
 
 	return &MetricServer{

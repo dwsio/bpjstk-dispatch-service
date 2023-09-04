@@ -6,9 +6,19 @@ services:
     container_name: zookeeper1
     restart: always
     ports:
-      - "2184:2181"
+      - "32181:32181"
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2184
+      ZOOKEEPER_CLIENT_PORT: 32181
+    networks: ["microservices"]
+
+  zookeeper2:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper2
+    restart: always
+    ports:
+      - "32182:32182"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 32182
     networks: ["microservices"]
 
   kafka1:
@@ -18,26 +28,15 @@ services:
     depends_on:
       - zookeeper1
     ports:
-      - "9094:9094"
+      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2184
-      KAFKA_LISTENERS: PLAINTEXT://:9094
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9094
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:32181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    networks: ["microservices"]
-
-  zookeeper2:
-    image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper2
-    restart: always
-    ports:
-      - "2185:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2185
     networks: ["microservices"]
 
   kafka2:
@@ -47,12 +46,11 @@ services:
     depends_on:
       - zookeeper2
     ports:
-      - "9095:9095"
+      - "29093:29093"
     environment:
       KAFKA_BROKER_ID: 2
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper2:2185
-      KAFKA_LISTENERS: PLAINTEXT://:9095
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9095
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper2:32182
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:29093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1

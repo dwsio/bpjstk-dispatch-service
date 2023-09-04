@@ -1,13 +1,128 @@
-version: "3.9"
-
+version: "1.0"
 services:
+  zookeeper1:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper1
+    restart: always
+    ports:
+      - "32181:32181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 32181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks: ["microservices"]
+
+  zookeeper2:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper2
+    restart: always
+    ports:
+      - "32182:32182"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 32182
+      ZOOKEEPER_TICK_TIME: 2000
+    networks: ["microservices"]
+
+  kafka1:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka1
+    restart: always
+    depends_on:
+      - zookeeper1
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:32181
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-host.docker.internal}:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks: ["microservices"]
+
+  kafka2:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka2
+    restart: always
+    depends_on:
+      - zookeeper2
+    ports:
+      - "29093:29093"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper2:32182
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka2:19093,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-host.docker.internal}:29093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks: ["microservices"]
+
+  redpanda1:
+    image: docker.redpanda.com/redpandadata/console:latest
+    container_name: redpanda1
+    restart: always
+    entrypoint: /bin/sh
+    command: -c "echo \"$$CONSOLE_CONFIG_FILE\" > /tmp/config.yml; /app/console"
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["kafka1:29092","kafka2:29093"]
+        server:
+          listenPort: 8082
+    depends_on:
+      - kafka1
+    ports:
+      - "8082:8082"
+    networks: ["microservices"]
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    restart: always
+    ports:
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+      - "14250:14250"
+      - "14268:14268"
+      - "14269:14269"
+      - "9411:9411"
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: 9411
+    networks: ["microservices"]
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+    networks: ["microservices"]
+
+  node_exporter:
+    image: prom/node-exporter
+    container_name: node_exporter
+    restart: always
+    ports:
+      - "9100:9100"
+    networks: ["microservices"]
+
   dispatch_service:
     container_name: dispatch_service
+    # image: 172.28.108.245:8082/cns-dev/dispatch-service:v1.0
     build:
       context: .
       dockerfile: docker/dispatch_service.Dockerfile
     ports:
-      - "8085:8085"
+      - "8090:8090"
     restart: always
     environment:
       PROJECT_SERVICE_NAME: "cns-dispatch"
@@ -26,8 +141,8 @@ services:
       ONESIGNAL_PUSH_PROVIDER_API_KEY: "MWE4M2U4OGEtMmRlZi00ODI0LTkxNDYtYjFiZmIyZTAzYzJk"
       ONESIGNAL_PUSH_PROVIDER_JMO_APP_ID: "40b2bca3-fbc3-47b1-a518-df6093404d7f"
       ONESIGNAL_PUSH_PROVIDER_SIPP_APP_ID: ""
-      KAFKA_PRODUCER_BROKERS: host.docker.internal:9095
-      KAFKA_CONSUMER_BROKERS: host.docker.internal:9094
+      KAFKA_PRODUCER_BROKERS: host.docker.internal:29093
+      KAFKA_CONSUMER_BROKERS: host.docker.internal:29092
       KAFKA_GROUP_ID: "cns_dispatch_consumer"
       KAFKA_POOL_SIZE: "10"
       KAFKA_PARTITION: "10"
@@ -35,7 +150,7 @@ services:
       KAFKA_TOPIC_CONSUMER: "cns_dsp_<channel>_email_<priority>,cns_dsp_<channel>_sms_<priority>,cns_dsp_<channel>_inapp_<priority>,cns_dsp_<channel>_push_<priority>"
       TRACER_ENDPOINT: http://host.docker.internal:14268/api/traces
       TRACER_PREFIX: "cns_dispatch"
-      METRIC_PORT: ":8085"
+      METRIC_PORT: ":8090"
       METRIC_PATH: "/metrics"
       METRIC_PREFIX: "cns_dispatch"
       METRIC_METER_NAME: "git.bpjsketenagakerjaan.go.id/centralized-notification-system/dispatch-service"
@@ -71,8 +186,8 @@ services:
       ONESIGNAL_PUSH_PROVIDER_API_KEY: "MWE4M2U4OGEtMmRlZi00ODI0LTkxNDYtYjFiZmIyZTAzYzJk"
       ONESIGNAL_PUSH_PROVIDER_JMO_APP_ID: "40b2bca3-fbc3-47b1-a518-df6093404d7f"
       ONESIGNAL_PUSH_PROVIDER_SIPP_APP_ID: ""
-      KAFKA_PRODUCER_BROKERS: host.docker.internal:9095
-      KAFKA_CONSUMER_BROKERS: host.docker.internal:9094
+      KAFKA_PRODUCER_BROKERS: host.docker.internal:29093
+      KAFKA_CONSUMER_BROKERS: host.docker.internal:29092
       KAFKA_GROUP_ID: "cns_dispatch_consumer"
       KAFKA_POOL_SIZE: "10"
       KAFKA_PARTITION: "10"
@@ -80,137 +195,12 @@ services:
       KAFKA_TOPIC_CONSUMER: "cns_dsp_<channel>_email_<priority>,cns_dsp_<channel>_sms_<priority>,cns_dsp_<channel>_inapp_<priority>,cns_dsp_<channel>_push_<priority>"
       TRACER_ENDPOINT: http://host.docker.internal:14268/api/traces
       TRACER_PREFIX: "cns_dispatch_test"
-      METRIC_PORT: ":8085"
+      METRIC_PORT: ":8090"
       METRIC_PATH: "/metrics"
       METRIC_PREFIX: "cns_dispatch_test"
       METRIC_METER_NAME: "git.bpjsketenagakerjaan.go.id/centralized-notification-system/dispatch-service"
     depends_on:
       - dispatch_service
-    networks: ["microservices"]
-
-  zookeeper1:
-    image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper1
-    restart: always
-    ports:
-      - "2184:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2184
-    networks: ["microservices"]
-
-  zookeeper2:
-    image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper2
-    restart: always
-    ports:
-      - "2185:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2185
-    networks: ["microservices"]
-
-  kafka1:
-    image: confluentinc/cp-kafka:latest
-    container_name: kafka1
-    restart: always
-    depends_on:
-      - zookeeper1
-    ports:
-      - "9094:9094"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper1:2184
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka1:19094,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-host.docker.internal}:9094
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    networks: ["microservices"]
-
-  kafka2:
-    image: confluentinc/cp-kafka:latest
-    container_name: kafka2
-    restart: always
-    depends_on:
-      - zookeeper2
-    ports:
-      - "9095:9095"
-    environment:
-      KAFKA_BROKER_ID: 2
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper2:2185
-      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka2:19095,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-host.docker.internal}:9095
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    networks: ["microservices"]
-
-  redpanda1:
-    image: docker.redpanda.com/redpandadata/console:latest
-    container_name: redpanda1
-    restart: always
-    entrypoint: /bin/sh
-    command: -c "echo \"$$CONSOLE_CONFIG_FILE\" > /tmp/config.yml; /app/console"
-    environment:
-      CONFIG_FILEPATH: /tmp/config.yml
-      CONSOLE_CONFIG_FILE: |
-        kafka:
-          brokers: ["kafka1:9094"]
-        server:
-          listenPort: 8082
-    depends_on:
-      - kafka1
-    ports:
-      - "8082:8082"
-    networks: ["microservices"]
-
-  redpanda2:
-    image: docker.redpanda.com/redpandadata/console:latest
-    container_name: redpanda2
-    restart: always
-    entrypoint: /bin/sh
-    command: -c "echo \"$$CONSOLE_CONFIG_FILE\" > /tmp/config.yml; /app/console"
-    environment:
-      CONFIG_FILEPATH: /tmp/config.yml
-      CONSOLE_CONFIG_FILE: |
-        kafka:
-          brokers: ["kafka2:9095"]
-        server:
-          listenPort: 8083
-    depends_on:
-      - kafka2
-    ports:
-      - "8083:8083"
-    networks: ["microservices"]
-
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: jaeger
-    restart: always
-    ports:
-      - "5775:5775/udp"
-      - "6831:6831/udp"
-      - "6832:6832/udp"
-      - "5778:5778"
-      - "16686:16686"
-      - "14268:14268"
-      - "14250:14250"
-      - "14269:14269"
-      - "4317:4317"
-      - "4318:4318"
-      - "9411:9411"
-    environment:
-      COLLECTOR_ZIPKIN_HTTP_PORT: 9411
-    networks: ["microservices"]
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml
-    command:
-      - --config.file=/etc/prometheus/prometheus.yaml
     networks: ["microservices"]
 
 networks:
